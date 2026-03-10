@@ -1,12 +1,29 @@
-from providers.groq_provider import GroqProvider
+from openai import OpenAI
+from providers.base import LLMProvider
 
-elif provider_name == "groq":
-    api_key = os.getenv("GROQ_API_KEY")
-    if not api_key:
-        raise ValueError("GROQ_API_KEY manquante dans le fichier .env")
-    return GroqProvider(
-        api_key=api_key,
-        model=config["groq_model"],
-        temperature=config["temperature"],
-        max_tokens=config["max_tokens"],
-    )
+
+class GroqProvider(LLMProvider):
+    """Provider pour les modèles Groq via leur API (compatible OpenAI)."""
+
+    def __init__(self, api_key: str, model: str, temperature: float, max_tokens: int):
+        self.client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.groq.com/openai/v1",
+        )
+        self.model = model
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+
+    def generate(self, question: str) -> str:
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "user", "content": question}
+            ],
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+        )
+        return response.choices[0].message.content.strip()
+
+    def name(self) -> str:
+        return f"groq/{self.model}"
