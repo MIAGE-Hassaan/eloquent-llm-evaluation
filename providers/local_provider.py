@@ -38,7 +38,7 @@ async def main():
     data = None
 
     #Boucle du fichier specific
-    with open("data/fr_specific.jsonl", "r", encoding="utf-8") as fr_specific:
+    with open("../data/fr_specific.jsonl", "r", encoding="utf-8") as fr_specific:
         for line in fr_specific:
             data = json.loads(line)
             
@@ -50,7 +50,7 @@ async def main():
                 break
     
     #Boucle du fichier unspecific
-    with open("data/fr_unspecific.jsonl", "r", encoding="utf-8") as fr_unspecific:
+    with open("../data/fr_unspecific.jsonl", "r", encoding="utf-8") as fr_unspecific:
         for line in fr_unspecific:
             data = json.loads(line)
             
