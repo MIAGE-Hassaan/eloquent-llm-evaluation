@@ -38,24 +38,24 @@ async def main():
     data = None
 
     #Boucle du fichier specific
-    with open("../data/fr_specific.jsonl", "r", encoding="utf-8") as fr_specific:
+    with open("data/fr_specific.jsonl", "r", encoding="utf-8") as fr_specific:
         for line in fr_specific:
             data = json.loads(line)
             
             response = await request(model, data["prompt"])
-            newLine(data["id"], response.json()["response"], "response_fr_specific.json")
+            newLine(data["id"], response.json()["response"], "outputs/response_fr_specific.json")
 
             #Retirer pour test réel
             if(data["id"] == "1-10"):
                 break
     
     #Boucle du fichier unspecific
-    with open("../data/fr_unspecific.jsonl", "r", encoding="utf-8") as fr_unspecific:
+    with open("data/fr_unspecific.jsonl", "r", encoding="utf-8") as fr_unspecific:
         for line in fr_unspecific:
             data = json.loads(line)
             
             response = await request(model, data["prompt"])
-            newLine(data["id"], response.json()["response"], "response_fr_unspecific.json")
+            newLine(data["id"], response.json()["response"], "outputs/response_fr_unspecific.json")
 
             #Retirer pour test réel
             if(data["id"] == "10"):
