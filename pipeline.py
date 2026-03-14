@@ -1,3 +1,9 @@
+"""
+pipeline.py — Lot A
+Lit un fichier JSONL, envoie chaque prompt au LLM configuré,
+et écrit les réponses dans un fichier JSONL de sortie.
+"""
+
 import json
 import logging
 import os
@@ -9,10 +15,16 @@ import yaml
 from dotenv import load_dotenv
 
 from providers.base import LLMProvider
-from providers.groq_provider import GroqProvider
+from providers.api_provider import GroqProvider
 from providers.local_provider import LocalProvider
 
+# Charge les variables d'environnement depuis .env
 load_dotenv()
+
+
+# ---------------------------------------------------------------------------
+# Chargement de la configuration
+# ---------------------------------------------------------------------------
 
 def load_config(config_path: str) -> dict:
     with open(config_path, "r", encoding="utf-8") as f:
@@ -108,10 +120,10 @@ def run_language(
 
             total += 1
             entry = json.loads(line)
-            question = entry.get("question", "")
+            prompt = entry.get("prompt", "")
 
             try:
-                answer = provider.generate(question)
+                answer = provider.generate(prompt)
                 entry["answer"] = answer
                 entry["model"] = provider.name()
                 success += 1
