@@ -1,14 +1,12 @@
-from openai import OpenAI
+from groq import Groq
 from providers.base import LLMProvider
 
 
 class GroqProvider(LLMProvider):
-    """Provider pour les modèles Groq via leur API (compatible OpenAI)."""
-
     def __init__(self, api_key: str, model: str, temperature: float, max_tokens: int):
-        self.client = OpenAI(
+        self.client = Groq(
             api_key=api_key,
-            base_url="https://api.groq.com/openai/v1",
+            base_url="https://api.groq.com",
         )
         self.model = model
         self.temperature = temperature

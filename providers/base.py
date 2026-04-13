@@ -1,18 +1,13 @@
 from abc import ABC, abstractmethod
 
-
+# Classe abstraite que tous les providers doivent implémenter
 class LLMProvider(ABC):
-    """Classe abstraite que tous les providers doivent implémenter."""
-
+    # Envoie une question au LLM et retourne la réponse sous forme de string
     @abstractmethod
     def generate(self, question: str) -> str:
-        """
-        Envoie une question au LLM et retourne la réponse sous forme de string.
-        Chaque appel est une session indépendante (pas de mémoire entre les questions).
-        """
         pass
 
+    # Retourne le nom du provider/modèle (pour les logs et métadonnées)
     @abstractmethod
     def name(self) -> str:
-        """Retourne le nom du provider/modèle (pour les logs et métadonnées)."""
         pass

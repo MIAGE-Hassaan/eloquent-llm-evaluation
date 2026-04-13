@@ -1,9 +1,3 @@
-"""
-pipeline.py — Lot A
-Lit un fichier JSONL, envoie chaque prompt au LLM configuré,
-et écrit les réponses dans un fichier JSONL de sortie.
-"""
-
 import json
 import logging
 import os
@@ -21,20 +15,12 @@ from providers.local_provider import LocalProvider
 # Charge les variables d'environnement depuis .env
 load_dotenv()
 
-
-# ---------------------------------------------------------------------------
 # Chargement de la configuration
-# ---------------------------------------------------------------------------
-
 def load_config(config_path: str) -> dict:
     with open(config_path, "r", encoding="utf-8") as f:
         return yaml.safe_load(f)
 
-
-# ---------------------------------------------------------------------------
 # Construction du provider selon la config
-# ---------------------------------------------------------------------------
-
 def build_provider(config: dict) -> LLMProvider:
     provider_name = config["provider"]
 
@@ -61,10 +47,7 @@ def build_provider(config: dict) -> LLMProvider:
         raise ValueError(f"Provider inconnu : '{provider_name}'. Valeurs acceptées : 'groq', 'local'")
 
 
-# ---------------------------------------------------------------------------
 # Setup du logger
-# ---------------------------------------------------------------------------
-
 def setup_logger(log_path: str) -> logging.Logger:
     logger = logging.getLogger("pipeline")
     logger.setLevel(logging.INFO)
@@ -82,10 +65,7 @@ def setup_logger(log_path: str) -> logging.Logger:
     return logger
 
 
-# ---------------------------------------------------------------------------
 # Traitement d'un fichier JSONL pour une langue
-# ---------------------------------------------------------------------------
-
 def run_language(
     lang: str,
     dataset_type: str,
@@ -93,10 +73,6 @@ def run_language(
     config: dict,
     logger: logging.Logger,
 ) -> dict:
-    """
-    Traite un fichier JSONL pour une langue donnée.
-    Retourne un dict de statistiques du run.
-    """
     data_dir = Path(config["data_dir"])
     output_dir = Path(config["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -120,10 +96,15 @@ def run_language(
 
             total += 1
             entry = json.loads(line)
-            prompt = entry.get("prompt", "")
+
+            # Cherche le champ question quel que soit son nom dans le fichier
+            question = entry.get("question") or entry.get("prompt") or entry.get("text") or ""
+
+            if not question:
+                logger.warning(f"[{lang}] Q{line_num} — champ question vide ou introuvable")
 
             try:
-                answer = provider.generate(prompt)
+                answer = provider.generate(question)
                 entry["answer"] = answer
                 entry["model"] = provider.name()
                 success += 1
@@ -141,10 +122,7 @@ def run_language(
     return {"lang": lang, "total": total, "success": success, "errors": errors}
 
 
-# ---------------------------------------------------------------------------
 # Point d'entrée principal
-# ---------------------------------------------------------------------------
-
 def run_pipeline(config_path: str = "config/baseline.yaml"):
     config = load_config(config_path)
 
