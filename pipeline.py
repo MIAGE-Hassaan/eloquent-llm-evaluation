@@ -233,7 +233,7 @@ def run_pipeline(config_path: str = "config/baseline.yaml"):
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Pipeline ELOQUENT — Lot A")
+    parser = argparse.ArgumentParser(description="Projet ELOQUENT")
     parser.add_argument(
         "--config",
         default="config/baseline.yaml",
