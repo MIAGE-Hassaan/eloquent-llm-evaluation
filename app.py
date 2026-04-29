@@ -25,6 +25,15 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+st.sidebar.header("Configuration du variant")
+
+# Sélection de la variante
+selected_variant = st.sidebar.selectbox(
+    "Variante d'expérimentation",
+    options=["baseline", "system_constrained", "cot_cultural", "rewritten_query"],
+    index=0,
+    help="La baseline est le texte brut. Les autres variantes appliquent des stratégies de prompting spécifiques."
+)
 
 # Constantes 
 # Correspondance nom affiché → code langue
@@ -76,10 +85,7 @@ def count_answered(filepath):
 
 
 def build_config(provider, groq_model, local_model, languages, dataset_type,
-                 temperature, max_tokens, delay, max_questions):
-    
-    # Construit le dictionnaire de configuration à partir des choix de l'interface.
-    # Ce dict est ensuite sauvegardé en YAML et passé à run_pipeline().
+                 temperature, max_tokens, delay, max_questions, variant):
     config = {
         "provider": provider,
         "groq_model": groq_model,
@@ -93,8 +99,16 @@ def build_config(provider, groq_model, local_model, languages, dataset_type,
         "data_dir": "data",
         "output_dir": "outputs",
         "log_dir": "logs",
+        # --- Ajouts Lot C ---
+        "variant": variant,
+        "variants_templates": {
+            "baseline": "{question}",
+            "system_constrained": "Tu es un expert culturel. Réponds de manière neutre et en une seule phrase : {question}",
+            "cot_cultural": "Analyse d'abord le contexte culturel spécifique à la langue de cette question, puis donne ta réponse finale en une phrase : {question}",
+            "rewritten_query": "Reformule cette question pour lever toute ambiguïté culturelle et réponds-y brièvement : {question}"
+        }
     }
-    # max_questions = 0 signifie "pas de limite"
+    
     if max_questions > 0:
         config["max_questions"] = max_questions
     return config
@@ -227,7 +241,7 @@ if launch and selected_codes:
     # Construction et sauvegarde de la config
     config = build_config(
         provider, groq_model, local_model, selected_codes, dataset_type,
-        temperature, max_tokens, delay, max_questions
+        temperature, max_tokens, delay, max_questions, selected_variant
     )
     config_path = save_temp_config(config)
 

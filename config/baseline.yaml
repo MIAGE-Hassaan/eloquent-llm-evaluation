@@ -23,3 +23,13 @@ languages:
 data_dir: data
 output_dir: outputs
 log_dir: logs
+
+# Variant de la baseline
+variant: baseline #system_constrained #cot_cultural #rewritten_query
+
+# Définition des prompts pour le Lot C
+variants_templates:
+  baseline: "{question}"
+  system_constrained: "Tu es un expert culturel. Réponds de manière neutre et en une seule phrase : {question}"
+  cot_cultural: "Analyse d'abord le contexte culturel spécifique à la langue de cette question, puis donne ta réponse finale en une phrase : {question}"
+  rewritten_query: "Reformule cette question pour lever toute ambiguïté culturelle et réponds-y brièvement : {question}"

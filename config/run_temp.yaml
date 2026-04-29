@@ -1,0 +1,22 @@
+data_dir: data
+dataset_type: specific
+delay_seconds: 1.0
+groq_model: llama-3.1-8b-instant
+languages:
+- fr
+local_base_url: http://localhost:11434
+local_model: llama3
+log_dir: logs
+max_tokens: 100
+output_dir: outputs
+provider: groq
+temperature: 0.0
+variant: baseline
+variants_templates:
+  baseline: '{question}'
+  cot_cultural: 'Analyse d''abord le contexte culturel spécifique à la langue de cette
+    question, puis donne ta réponse finale en une phrase : {question}'
+  rewritten_query: 'Reformule cette question pour lever toute ambiguïté culturelle
+    et réponds-y brièvement : {question}'
+  system_constrained: 'Tu es un expert culturel. Réponds de manière neutre et en une
+    seule phrase : {question}'
