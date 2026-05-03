@@ -1,0 +1,22 @@
+{
+    "team": "votre-nom-de-groupe",
+    "system": "eloquent-miage-v1",
+    "model": "llama-3.3",
+    "submissionid": "experiment-20260503_172604",
+    "date": "2026-05-03",
+    "label": "eloquent-2026-cultural",
+    "languages": [
+        "fr"
+    ],
+    "modifications": {
+        "system_prompt": "Standard LLM prompt",
+        "prompt_prefix_generic": "",
+        "prompt_suffix_generic": "",
+        "generation_params": {
+            "do_sample": false,
+            "max_new_tokens": 100,
+            "temperature": 0.0
+        },
+        "notes": "Test de la variante 'baseline' sur dataset 'specific' avec groq"
+    }
+}

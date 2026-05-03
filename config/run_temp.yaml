@@ -1,13 +1,15 @@
 data_dir: data
 dataset_type: specific
-delay_seconds: 1.0
-groq_model: llama-3.1-8b-instant
+delay: 0.5
+delay_seconds: 0.5
+groq_model: llama-3.3
 languages:
 - fr
 local_base_url: http://localhost:11434
-local_model: llama3
+local_model: gemma2:9b
 log_dir: logs
 max_tokens: 100
+model_name: llama-3_3
 output_dir: outputs
 provider: groq
 temperature: 0.0

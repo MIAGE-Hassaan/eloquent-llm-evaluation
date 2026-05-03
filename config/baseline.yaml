@@ -1,4 +1,4 @@
-provider: groq # Peut être "local" ou "groq" (API)
+provider: groq # "local" ou "groq" (API)
 groq_model: llama-3.1-8b-instant
 
 

@@ -1,0 +1,22 @@
+{
+    "team": "votre-nom-de-groupe",
+    "system": "eloquent-miage-v1",
+    "model": "llama-3.3",
+    "submissionid": "experiment-20260503_172335",
+    "date": "2026-05-03",
+    "label": "eloquent-2026-cultural",
+    "languages": [
+        "de"
+    ],
+    "modifications": {
+        "system_prompt": "Analyse d'abord le contexte culturel spécifique à la langue de cette question, puis donne ta réponse finale en une phrase ",
+        "prompt_prefix_generic": "Analyse d'abord le contexte culturel spécifique à la langue de cette question, puis donne ta réponse finale en une phrase :",
+        "prompt_suffix_generic": "",
+        "generation_params": {
+            "do_sample": false,
+            "max_new_tokens": 100,
+            "temperature": 0.0
+        },
+        "notes": "Test de la variante 'cot_cultural' sur dataset 'specific' avec groq"
+    }
+}
