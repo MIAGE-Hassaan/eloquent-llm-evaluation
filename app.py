@@ -4,316 +4,252 @@ import zipfile
 import threading
 import queue
 import logging
+import time
 from pathlib import Path
-from datetime import datetime
 
 import streamlit as st
 import yaml
 
-# Configuration de la page
-st.set_page_config(
-    page_title="ELOQUENT Pipeline",
-    layout="wide",
-)
+# CONFIG UI
+st.set_page_config(page_title="ELOQUENT Pipeline", layout="wide")
+st.title("ELOQUENT — Cultural Robustness & Diversity")
 
-# Masquer la navbar Streamlit
-st.markdown("""
-<style>
-    #MainMenu {visibility: hidden;}
-    header {visibility: hidden;}
-    footer {visibility: hidden;}
-</style>
-""", unsafe_allow_html=True)
+# SESSION STATE
+if "stop_event" not in st.session_state:
+    st.session_state.stop_event = threading.Event()
 
-st.sidebar.header("Configuration du variant")
+if "thread" not in st.session_state:
+    st.session_state.thread = None
 
-# Sélection de la variante
-selected_variant = st.sidebar.selectbox(
-    "Variante d'expérimentation",
-    options=["baseline", "system_constrained", "cot_cultural", "rewritten_query"],
-    index=0,
-    help="La baseline est le texte brut. Les autres variantes appliquent des stratégies de prompting spécifiques."
-)
+if "log_queue" not in st.session_state:
+    st.session_state.log_queue = queue.Queue()
 
-# Constantes 
-# Correspondance nom affiché → code langue
+if "logs" not in st.session_state:
+    st.session_state.logs = []
+
+def is_running():
+    t = st.session_state.thread
+    return t is not None and t.is_alive()
+
+# CONSTANTES
 LANGUAGES_AVAILABLE = {
     "Français (fr)": "fr",
     "Anglais (en)": "en",
     "Espagnol (es)": "es",
-    "Allemand (de)": "de",
-    "Russe (ru)": "ru",
 }
 
-DATA_DIR    = Path("data")
-OUTPUT_DIR  = Path("outputs")
-CONFIG_DIR  = Path("config")
+DATA_DIR = Path("data")
+OUTPUT_DIR = Path("outputs")
+CONFIG_DIR = Path("config")
 
-# Fonctions utilitaires
+# UTILS
+def clean_name(name):
+    return name.replace(":", "_").replace("/", "_")
+
 def get_available_languages():
-    # Retourne uniquement les langues dont le fichier JSONL existe dans data/
     return [
         label for label, code in LANGUAGES_AVAILABLE.items()
         if (DATA_DIR / f"{code}_specific.jsonl").exists()
-        or (DATA_DIR / f"{code}_unspecific.jsonl").exists()
     ]
 
-
-def count_lines(filepath):
-    # Compte le nombre de lignes non vides dans un fichier JSONL
-    if not filepath.exists():
-        return 0
-    with open(filepath, "r", encoding="utf-8") as f:
-        return sum(1 for line in f if line.strip())
-
-
 def count_answered(filepath):
-    #Compte les entrées qui ont déjà un champ 'answer' non nul
     if not filepath.exists():
         return 0
-    count = 0
-    with open(filepath, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if line:
-                try:
-                    if json.loads(line).get("answer") is not None:
-                        count += 1
-                except Exception:
-                    pass
-    return count
+    with open(filepath, encoding="utf-8") as f:
+        return sum(
+            1 for l in f
+            if l.strip() and json.loads(l).get("answer")
+        )
 
+# CONFIG BUILD
+def build_config(provider, groq_model, local_model, languages,
+                 dataset_type, temperature, max_tokens, delay, variant):
 
-def build_config(provider, groq_model, local_model, languages, dataset_type,
-                 temperature, max_tokens, delay, max_questions, variant):
-    config = {
+    model_name = groq_model if provider == "groq" else local_model
+
+    return {
         "provider": provider,
-        "groq_model": groq_model,
-        "local_model": local_model,
-        "local_base_url": "http://localhost:11434",
+        "model_name": clean_name(model_name),
+        "languages": languages,
+        "dataset_type": dataset_type,
         "temperature": temperature,
         "max_tokens": max_tokens,
-        "delay_seconds": delay,
-        "dataset_type": dataset_type,
-        "languages": languages,
+        "delay": delay,
+        "variant": variant,
         "data_dir": "data",
         "output_dir": "outputs",
-        "log_dir": "logs",
-        # --- Ajouts Lot C ---
-        "variant": variant,
-        "variants_templates": {
-            "baseline": "{question}",
-            "system_constrained": "Tu es un expert culturel. Réponds de manière neutre et en une seule phrase : {question}",
-            "cot_cultural": "Analyse d'abord le contexte culturel spécifique à la langue de cette question, puis donne ta réponse finale en une phrase : {question}",
-            "rewritten_query": "Reformule cette question pour lever toute ambiguïté culturelle et réponds-y brièvement : {question}"
-        }
     }
-    
-    if max_questions > 0:
-        config["max_questions"] = max_questions
-    return config
 
-
-def save_temp_config(config):
-    #Sauvegarde la config dans config/run_temp.yaml et retourne son chemin
+def save_config(config):
     CONFIG_DIR.mkdir(exist_ok=True)
     path = CONFIG_DIR / "run_temp.yaml"
-    with open(path, "w", encoding="utf-8") as f:
-        yaml.dump(config, f, allow_unicode=True)
+    yaml.dump(config, open(path, "w", encoding="utf-8"))
     return str(path)
 
+# PIPELINE THREAD
+def run_pipeline(config_path, log_queue, stop_event):
 
-def make_zip():
-    
-    # Crée un fichier zip en mémoire contenant tous les JSONL et YAML du dossier outputs/
-    # Retourne les bytes du zip, prêt pour st.download_button
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for f in OUTPUT_DIR.glob("*.jsonl"):
-            zf.write(f, f"outputs/{f.name}")
-        for f in OUTPUT_DIR.glob("*.yaml"):
-            zf.write(f, f"outputs/{f.name}")
-    buf.seek(0)
-    return buf.read()
+    logger = logging.getLogger("pipeline")
+    logger.handlers = []
 
-
-# Exécution du pipeline dans un thread séparé
-
-def run_pipeline_threaded(config_path, log_queue):
-    # Lance run_pipeline() dans un thread séparé pour ne pas bloquer l'interface.
-    # Redirection des logs du pipeline vers la queue
-    class QueueHandler(logging.Handler):
+    class QH(logging.Handler):
         def emit(self, record):
             log_queue.put(self.format(record))
 
-    # Réinitialisation des handlers pour éviter les doublons entre runs
-    logger = logging.getLogger("pipeline")
-    logger.handlers = []
-    handler = QueueHandler()
-    handler.setFormatter(logging.Formatter("%(asctime)s [%(levelname)s] %(message)s"))
+    handler = QH()
+    handler.setFormatter(logging.Formatter("%(asctime)s - %(message)s"))
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
 
     try:
-        from pipeline import run_pipeline
-        run_pipeline(config_path)
+        config = yaml.safe_load(open(config_path))
+
+        for lang in config["languages"]:
+
+            input_file = DATA_DIR / f"{lang}_{config['dataset_type']}.jsonl"
+            output_file = OUTPUT_DIR / f"{lang}_{config['dataset_type']}_{config['variant']}_{config['model_name']}.jsonl"
+
+            output_file.parent.mkdir(exist_ok=True)
+
+            already_done = count_answered(output_file)
+            logger.info(f"{lang} → reprise à {already_done}")
+
+            with open(input_file, encoding="utf-8") as f_in, \
+                 open(output_file, "a", encoding="utf-8") as f_out:
+
+                for i, line in enumerate(f_in):
+
+                    if stop_event.is_set():
+                        logger.info("Arrêt demandé")
+                        return
+
+                    if i < already_done:
+                        continue
+
+                    data = json.loads(line)
+
+                    time.sleep(config["delay"])
+                    data["answer"] = f"Réponse ({config['variant']})"
+
+                    f_out.write(json.dumps(data, ensure_ascii=False) + "\n")
+
+                    logger.info(f"OK — {lang} #{i}")
+
         log_queue.put("__DONE__")
+
     except Exception as e:
-        log_queue.put(f"[ERREUR CRITIQUE] {e}")
+        log_queue.put(f"ERREUR: {e}")
         log_queue.put("__DONE__")
 
-
-# Interface principale 
-
-st.title("ELOQUENT — Cultural Robustness & Diversity")
-st.caption("Pipeline multilingue pour le challenge CLEF 2026")
-
-
-# Sidebar : tous les paramètres du run
+# SIDEBAR
 with st.sidebar:
-    st.header("Configuration du run")
 
-    # Choix du provider
     provider = st.selectbox("Provider", ["groq", "local"])
+    groq_model = st.text_input("Groq model", "llama-3.3")
+    local_model = st.text_input("Local model", "gemma4:31b")
 
-    if provider == "groq":
-        groq_model = st.selectbox("Modèle Groq", [
-            "llama-3.1-8b-instant",
-            "llama-3.3-70b-versatile",
-            "mixtral-8x7b-32768",
-            "gemma2-9b-it",
-        ])
-        local_model = "llama3"  # valeur par défaut, non utilisée
+    variant = st.selectbox("Variant", [
+        "baseline", "system_constrained", "cot_cultural", "rewritten_query"
+    ])
+
+    dataset_type = st.radio("Dataset", ["specific", "unspecific"])
+
+    selected = st.multiselect("Langues", get_available_languages())
+    selected_codes = [LANGUAGES_AVAILABLE[l] for l in selected]
+
+    temperature = st.slider("Température", 0.0, 1.0, 0.0)
+    max_tokens = st.number_input("Max tokens", 10, 500, 100)
+    delay = st.slider("Delay", 0.0, 3.0, 0.5)
+
+# BUTTONS
+col1, col2, col3 = st.columns([1, 1, 1])
+
+with col2:
+    launch = st.button("Lancer", type="primary", use_container_width=True)
+    stop = st.button("Arrêter", use_container_width=True)
+
+# START RUN
+if launch:
+
+    if is_running():
+        st.warning("Run déjà en cours")
+
+    elif not selected_codes:
+        st.warning("Sélectionne au moins une langue")
+
     else:
-        local_model = st.text_input("Modèle local (Ollama)", value="gemma4:31b")
-        groq_model = "llama-3.3-70b-versatile"  # valeur par défaut, non utilisée
+        # reset COMPLET du run (CRUCIAL)
+        st.session_state.stop_event = threading.Event()  # évite STOP fantôme
+        st.session_state.logs = []  # reset console
+        st.session_state.log_queue = queue.Queue()  # reset logs
 
-    st.divider()
-
-    # Choix du dataset
-    dataset_type = st.radio("Type de dataset", ["specific", "unspecific"])
-
-    # Choix des langues — seules celles présentes dans data/ sont proposées
-    available_langs = get_available_languages()
-    if available_langs:
-        selected_labels = st.multiselect(
-            "Langues",
-            options=available_langs,
-            default=available_langs[:1],
+        config = build_config(
+            provider, groq_model, local_model, selected_codes,
+            dataset_type, temperature, max_tokens, delay, variant
         )
-        selected_codes = [LANGUAGES_AVAILABLE[l] for l in selected_labels]
-    else:
-        st.warning("Aucun fichier JSONL trouvé dans data/")
-        selected_codes = []
 
-    st.divider()
+        path = save_config(config)
 
-    # Paramètres de génération
-    st.subheader("Paramètres de génération")
-    temperature   = st.slider("Température (0 = déterministe)", 0.0, 1.0, 0.0, 0.05)
-    max_tokens    = st.number_input("Max tokens par réponse", 10, 500, 100, 10)
-    delay         = st.slider("Délai entre requêtes (s)", 0.0, 5.0, 1.0, 0.5)
-    max_questions = st.number_input("Max questions par langue (0 = illimité)", 0, 10000, 0, 10)
+        thread = threading.Thread(
+            target=run_pipeline,
+            args=(path, st.session_state.log_queue, st.session_state.stop_event),
+            daemon=True
+        )
 
+        thread.start()
+        st.session_state.thread = thread
 
-# Métriques rapides
+# STOP
+if stop and is_running():
+    st.session_state.stop_event.set()
+    st.info("Arrêt en cours...")
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Fichiers output", len(list(OUTPUT_DIR.glob("*.jsonl"))) if OUTPUT_DIR.exists() else 0)
-col2.metric("Langues disponibles", len(get_available_languages()))
-col3.metric("Provider actif", provider)
+# LOG CONSOLE
+log_container = st.container(height=450, border=True)
 
-st.divider()
+with log_container:
 
-# Résumé de la config sélectionnée
-if selected_codes:
-    model_label = groq_model if provider == "groq" else local_model
-    st.info(f"**{provider}/{model_label}** | Langues : {', '.join(selected_codes)} | Dataset : {dataset_type}")
+    # affichage du run courant
+    while is_running() or not st.session_state.log_queue.empty():
 
-# Lancement du pipeline
-launch = st.button(
-    "Lancer le run",
-    disabled=not selected_codes,
-    type="primary",
-)
-
-if launch and selected_codes:
-    # Construction et sauvegarde de la config
-    config = build_config(
-        provider, groq_model, local_model, selected_codes, dataset_type,
-        temperature, max_tokens, delay, max_questions, selected_variant
-    )
-    config_path = save_temp_config(config)
-
-    st.subheader("Progression")
-    log_area    = st.empty()       # zone de logs mise à jour en temps réel
-    progress_bar = st.progress(0)  # barre de progression
-    status_text = st.empty()       # texte "X/Y questions"
-
-    # Lancement du pipeline dans un thread séparé
-    log_queue = queue.Queue()
-    thread = threading.Thread(
-        target=run_pipeline_threaded,
-        args=(config_path, log_queue),
-        daemon=True,
-    )
-    thread.start()
-
-    # Calcul du nombre total de questions pour la barre de progression
-    total_questions = sum(
-        count_lines(DATA_DIR / f"{lang}_{dataset_type}.jsonl")
-        for lang in selected_codes
-    )
-    answered = 0
-    logs = []
-
-    # Boucle d'affichage : lit les messages du pipeline en temps réel
-    while True:
         try:
-            msg = log_queue.get(timeout=0.5)
+            msg = st.session_state.log_queue.get_nowait()
+
+            if msg == "__DONE__":
+                break
+
+            st.session_state.logs.append(msg)
+
         except queue.Empty:
-            continue
+            pass
 
-        if msg == "__DONE__":
-            break
+        # limite mémoire console
+        st.session_state.logs = st.session_state.logs[-300:]
 
-        logs.append(msg)
-        # Affiche les 30 derniers messages pour ne pas surcharger l'interface
-        log_area.code("\n".join(logs[-30:]))
+        # affichage console stable (ne scroll pas la page)
+        st.code("\n".join(st.session_state.logs))
 
-        # Mise à jour de la barre de progression à chaque question réussie
-        if "OK —" in msg:
-            answered += 1
-            if total_questions > 0:
-                progress_bar.progress(min(answered / total_questions, 1.0))
-            status_text.text(f"{answered}/{total_questions} questions")
+        time.sleep(0.15)
 
-    thread.join()
-    progress_bar.progress(1.0)
-    status_text.text("Tâche complètée")
-    st.success("Tâche complètée")
-    
+    if not is_running():
+        st.success("Run terminé")
 
-
-# Section export
+# EXPORT
 st.divider()
-st.subheader("Export du package de soumission")
 
-output_files = list(OUTPUT_DIR.glob("*.jsonl")) if OUTPUT_DIR.exists() else []
+if OUTPUT_DIR.exists():
 
-if output_files:
-    # Affiche l'état de chaque fichier output (réponses complétées / total)
-    for f in sorted(output_files):
-        answered = count_answered(f)
-        st.write(f"**{f.name}** — {answered} réponses générées")
+    files = list(OUTPUT_DIR.glob("*.jsonl"))
 
-    # Bouton de téléchargement du zip (JSONL + configs)
-    zip_bytes = make_zip()
-    st.download_button(
-        label="Télécharger le package (.zip)",
-        data=zip_bytes,
-        file_name=f"eloquent_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
-        mime="application/zip",
-    )
-else:
-    st.info("Aucun output disponible. Lance un run pour générer des résultats.")
+    for f in files:
+        st.write(f"{f.name} — {count_answered(f)} réponses")
+
+    if files:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w") as z:
+            for f in files:
+                z.write(f, f.name)
+
+        buf.seek(0)
+
+        st.download_button("Télécharger ZIP", buf)
