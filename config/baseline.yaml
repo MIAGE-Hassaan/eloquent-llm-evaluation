@@ -1,35 +1,47 @@
-provider: groq # "local" ou "groq" (API)
+provider: groq                          # "local" ou "groq"
 groq_model: llama-3.1-8b-instant
 
-
-# Paramètres modèle local (Ollama)
-local_model: gemma4:31b # Nom du modèle Ollama utilisé
+# Modèle local (Ollama)
+local_model: gemma4:31b
 local_base_url: http://localhost:11434
 
-# Paramètres de génération
-temperature: 0 # 0 = déterministe (obligatoire pour la baseline)
-max_tokens: 2000 # réponse courte (~1 phrase)
+# Métadonnées de soumission ELOQUENT
+team: Master MIAGE Toulouse
+system: eloquent-miage-v1
+label: eloquent-2026-cultural
+
+# Paramètres de génération — spec ELOQUENT : max_new_tokens=200, do_sample=False pour la baseline
+temperature: 0                          # 0 = déterministe (obligatoire baseline)
+max_tokens: 200                         # ~1 phrase (spec ELOQUENT)
 
 # Dataset
-dataset_type: specific # "specific" ou "unspecific"
+dataset_type: specific                  # "specific" ou "unspecific"
 languages:
   - fr
+  - en
   - es
   - de
   - ru
-  - en
 
 # Dossiers
 data_dir: data
 output_dir: outputs
 log_dir: logs
 
-# Variant de la baseline
-variant: baseline #system_constrained #cot_cultural #rewritten_query
+# Variante active
+variant: baseline                       # baseline | system_constrained | cot_cultural | rewritten_query
 
-# Définition des prompts pour le Lot C
+# Templates de prompt — {question} est obligatoire dans chaque template
 variants_templates:
   baseline: "{question}"
-  system_constrained: "Tu es un expert culturel. Réponds de manière neutre et en une seule phrase : {question}"
-  cot_cultural: "Analyse d'abord le contexte culturel spécifique à la langue de cette question, puis donne ta réponse finale en une phrase : {question}"
-  rewritten_query: "Reformule cette question pour lever toute ambiguïté culturelle et réponds-y brièvement : {question}"
+  system_constrained: "{question}"
+  cot_cultural: "{question}\n\nConsider the cultural context specific to the language of this question, then provide your final answer in exactly one sentence."
+  rewritten_query: "Rephrase the following question to remove any cultural ambiguity, then answer it in one sentence: {question}"
+
+# System prompts par variante (en anglais, conformément à la spec ELOQUENT)
+# Chaîne vide = pas de system prompt
+variants_system_prompts:
+  baseline: ""
+  system_constrained: "You are a culturally aware assistant. Respond concisely in one sentence, accurately reflecting the local customs and cultural norms relevant to the language of the question."
+  cot_cultural: ""
+  rewritten_query: ""
