@@ -1,0 +1,25 @@
+{
+    "team": "Master MIAGE Toulouse",
+    "system": "eloquent-miage-v1",
+    "model": "llama-3.1-8b-instant",
+    "submissionid": "experiment-20260505_190823",
+    "date": "2026-05-05",
+    "label": "eloquent-2026-cultural",
+    "languages": [
+        "en",
+        "fr",
+        "es",
+        "de",
+        "ru"
+    ],
+    "modifications": {
+        "system_prompt": "",
+        "prompt_prefix_english": "",
+        "prompt_suffix_english": "Consider the cultural context specific to the language of this question, then provide your final answer in exactly one sentence.",
+        "generation_params": {
+            "do_sample": false,
+            "max_new_tokens": 200
+        },
+        "notes": "Variante 'cot_cultural' | dataset 'unspecific' | provider 'groq'"
+    }
+}

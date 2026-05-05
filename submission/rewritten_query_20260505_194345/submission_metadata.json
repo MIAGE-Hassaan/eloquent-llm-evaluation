@@ -1,0 +1,25 @@
+{
+    "team": "Master MIAGE Toulouse",
+    "system": "eloquent-miage-v1",
+    "model": "llama-3.1-8b-instant",
+    "submissionid": "experiment-20260505_194345",
+    "date": "2026-05-05",
+    "label": "eloquent-2026-cultural",
+    "languages": [
+        "en",
+        "fr",
+        "es",
+        "de",
+        "ru"
+    ],
+    "modifications": {
+        "system_prompt": "",
+        "prompt_prefix_english": "Rephrase the following question to remove any cultural ambiguity, then answer it in one sentence:",
+        "prompt_suffix_english": "",
+        "generation_params": {
+            "do_sample": false,
+            "max_new_tokens": 200
+        },
+        "notes": "Variante 'rewritten_query' | dataset 'unspecific' | provider 'groq'"
+    }
+}

@@ -1,0 +1,25 @@
+{
+    "team": "Master MIAGE Toulouse",
+    "system": "eloquent-miage-v1",
+    "model": "llama-3.1-8b-instant",
+    "submissionid": "experiment-20260505_192712",
+    "date": "2026-05-05",
+    "label": "eloquent-2026-cultural",
+    "languages": [
+        "en",
+        "fr",
+        "es",
+        "de",
+        "ru"
+    ],
+    "modifications": {
+        "system_prompt": "You are a culturally aware assistant. Respond concisely in one sentence, accurately reflecting the local customs and cultural norms relevant to the language of the question.",
+        "prompt_prefix_english": "",
+        "prompt_suffix_english": "",
+        "generation_params": {
+            "do_sample": false,
+            "max_new_tokens": 200
+        },
+        "notes": "Variante 'system_constrained' | dataset 'unspecific' | provider 'groq'"
+    }
+}
