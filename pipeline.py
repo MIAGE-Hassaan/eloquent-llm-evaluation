@@ -217,6 +217,7 @@ def run_language(
     max_questions = config.get("max_questions", None)
     total = success = errors = skipped = 0
 
+    limit_reached_logged = False
     with open(input_file, "r", encoding="utf-8") as fin:
         all_entries = [json.loads(l) for l in fin if l.strip()]
 
@@ -240,6 +241,9 @@ def run_language(
 
             # Limite optionnelle de questions
             if max_questions and total >= max_questions:
+                if not limit_reached_logged:
+                    logger.info(f"[{lang}] Limite de {max_questions} questions atteinte. Passage à la suite.")
+                    limit_reached_logged = True
                 fout.write(json.dumps(entry, ensure_ascii=False) + "\n")
                 continue
 
@@ -329,6 +333,7 @@ def save_submission_metadata(config: dict, timestamp: str, submission_dir: Path 
             "generation_params": {
                 "do_sample":      config.get("temperature", 0) > 0,
                 "max_new_tokens": config.get("max_tokens", 200),
+                "max_questions": config.get("max_questions", 0),
             },
             "notes": (
                 f"Variante '{variant_active}' | dataset '{config.get('dataset_type')}' "

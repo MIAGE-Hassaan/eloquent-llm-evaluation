@@ -130,7 +130,7 @@ def load_baseline() -> dict:
 # ---------------------------------------------------------------------------
 
 def build_config(provider, groq_model, local_model, languages,
-                 dataset_type, temperature, max_tokens, delay, variant) -> dict:
+                 dataset_type, temperature, max_tokens, delay, variant, max_questions) -> dict:
     config = load_baseline()                    # base = baseline.yaml
     config["provider"]      = provider
     config["groq_model"]    = groq_model
@@ -142,6 +142,7 @@ def build_config(provider, groq_model, local_model, languages,
     config["max_tokens"]    = max_tokens
     config["delay_seconds"] = delay
     config["variant"]       = variant
+    config["max_questions"] = max_questions
     config["data_dir"]      = "data"
     config["output_dir"]    = "outputs"
     config["log_dir"]       = "logs"
@@ -219,6 +220,9 @@ with st.sidebar:
                             help="0 = déterministe (obligatoire pour la baseline)")
     max_tokens  = st.number_input("Max tokens", 10, 500, 200,
                                   help="Spec ELOQUENT : max_new_tokens=200")
+    max_questions = st.number_input("Max réponses par langue", 0, 10000, 0,
+                                    help="0 = pas de limite (toutes les questions du dataset). "
+                                         "Cette limite s'applique au nombre total de réponses générées par langue.")
     delay       = st.slider("Délai entre questions (s)", 0.0, 3.0, 0.5)
 
 # ---------------------------------------------------------------------------
@@ -242,7 +246,7 @@ if launch:
         st.session_state.run_done   = False
 
         cfg      = build_config(provider, groq_model, local_model, selected_codes,
-                                dataset_type, temperature, max_tokens, delay, variant)
+                                dataset_type, temperature, max_tokens, delay, variant, max_questions)
         cfg_path = save_config(cfg)
 
         t = threading.Thread(
