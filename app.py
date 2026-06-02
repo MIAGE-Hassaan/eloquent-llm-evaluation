@@ -130,7 +130,7 @@ def load_baseline() -> dict:
 # ---------------------------------------------------------------------------
 
 def build_config(provider, groq_model, local_model, languages,
-                 dataset_type, temperature, max_tokens, delay, variant, max_questions) -> dict:
+                 dataset_type, temperature, max_tokens, delay, variant, max_questions, resume) -> dict:
     config = load_baseline()                    # base = baseline.yaml
     config["provider"]      = provider
     config["groq_model"]    = groq_model
@@ -143,6 +143,7 @@ def build_config(provider, groq_model, local_model, languages,
     config["delay_seconds"] = delay
     config["variant"]       = variant
     config["max_questions"] = max_questions
+    config["resume"]        = resume
     config["data_dir"]      = "data"
     config["output_dir"]    = "outputs"
     config["log_dir"]       = "logs"
@@ -224,6 +225,9 @@ with st.sidebar:
                                     help="0 = pas de limite (toutes les questions du dataset). "
                                          "Cette limite s'applique au nombre total de réponses générées par langue.")
     delay       = st.slider("Délai entre questions (s)", 0.0, 3.0, 0.5)
+    resume      = st.checkbox("Reprendre le run existant (reprise)", value=True,
+                              help="Si activé, réutilise les réponses déjà générées pour cette variante. "
+                                   "Décochez pour forcer une nouvelle génération de zéro (ex: changement de paramètres ou nouveau run).")
 
 # ---------------------------------------------------------------------------
 # Boutons de contrôle
@@ -246,7 +250,7 @@ if launch:
         st.session_state.run_done   = False
 
         cfg      = build_config(provider, groq_model, local_model, selected_codes,
-                                dataset_type, temperature, max_tokens, delay, variant, max_questions)
+                                dataset_type, temperature, max_tokens, delay, variant, max_questions, resume)
         cfg_path = save_config(cfg)
 
         t = threading.Thread(

@@ -210,7 +210,8 @@ def run_language(
         logger.warning(f"[{lang}] Fichier source introuvable : {input_file}")
         return {"lang": lang, "total": 0, "success": 0, "errors": 0, "skipped": 0}
 
-    already_done = load_already_done(work_file)
+    resume_run = config.get("resume", True)
+    already_done = load_already_done(work_file) if resume_run else {}
     logger.info(f"[{lang}] Variant={variant_name} | Reprise={len(already_done)} déjà traités")
 
     delay         = config.get("delay_seconds", 0)
@@ -220,6 +221,10 @@ def run_language(
     limit_reached_logged = False
     with open(input_file, "r", encoding="utf-8") as fin:
         all_entries = [json.loads(l) for l in fin if l.strip()]
+
+    # Si une limite est définie, on ne garde que les premières questions
+    if max_questions and max_questions > 0:
+        all_entries = all_entries[:max_questions]
 
     with open(work_file, "w", encoding="utf-8") as fout:
         for idx, entry in enumerate(all_entries):
@@ -273,9 +278,9 @@ def run_language(
                 time.sleep(delay)
 
     # Export fichier de soumission propre
-    if success > 0:
+    if success > 0 or skipped > 0:
         sub_path = export_submission_file(work_file, submission_dir, lang, dataset_type)
-        logger.info(f"[{lang}] → soumission : {sub_path.name} ({success} réponses)")
+        logger.info(f"[{lang}] → soumission : {sub_path.name} ({success + skipped} réponses)")
 
     return {"lang": lang, "total": total, "success": success,
             "errors": errors, "skipped": skipped}
