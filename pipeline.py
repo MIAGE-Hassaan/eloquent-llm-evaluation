@@ -59,12 +59,13 @@ def load_config(config_path: str) -> dict:
         return yaml.safe_load(f)
 
 
-def build_provider(config: dict, system_prompt: str = "") -> LLMProvider:
+def build_provider(config: dict, system_prompt: str = "", api_key: str = None) -> LLMProvider:
     provider_name = config["provider"]
     sp = system_prompt if system_prompt else None
 
     if provider_name == "groq":
-        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            api_key = os.getenv("GROQ_API_KEY")
         if not api_key:
             raise ValueError("GROQ_API_KEY manquante dans le fichier .env")
         return GroqProvider(
@@ -393,15 +394,50 @@ def run_pipeline(config_path: str = "config/baseline.yaml", stop_event=None):
 
     all_stats = []
     try:
-        for lang in config["languages"]:
-            if stop_event and stop_event.is_set():
-                break
-            stats = run_language(
-                lang, config["dataset_type"], provider, config, logger,
-                submission_dir=submission_dir,
-                stop_event=stop_event,
-            )
-            all_stats.append(stats)
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+
+        # Gather available GROQ API keys
+        api_keys = [
+            os.getenv("GROQ_API_KEY"),
+            os.getenv("GROQ_API_KEY2"),
+            os.getenv("GROQ_API_KEY3"),
+            os.getenv("GROQ_API_KEY4"),
+            os.getenv("GROQ_API_KEY5"),
+        ]
+        api_keys = [k for k in api_keys if k]
+        if not api_keys:
+            api_keys = [os.getenv("GROQ_API_KEY")]
+
+        max_workers = min(5, len(config["languages"]))
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {}
+            for i, lang in enumerate(config["languages"]):
+                if stop_event and stop_event.is_set():
+                    break
+                
+                # Assign key round-robin to each language
+                key = api_keys[i % len(api_keys)] if config["provider"] == "groq" else None
+                lang_provider = build_provider(config, system_prompt=system_prompt, api_key=key)
+                
+                future = executor.submit(
+                    run_language,
+                    lang,
+                    config["dataset_type"],
+                    lang_provider,
+                    config,
+                    logger,
+                    submission_dir=submission_dir,
+                    stop_event=stop_event,
+                )
+                futures[future] = lang
+                
+            for future in as_completed(futures):
+                lang = futures[future]
+                try:
+                    stats = future.result()
+                    all_stats.append(stats)
+                except Exception as exc:
+                    logger.error(f"Erreur critique dans la tâche pour {lang} : {exc}")
     except Exception as exc:
         logger.error(f"Erreur critique : {exc}")
     finally:
